@@ -129,27 +129,32 @@ app.post('/api/chat', async (req, res) => {
     // Prepare the conversation context
     const conversationContext = [...history];
 
-    // Generate response using Gemini AI
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+    // Create the model and generate content
+    const model = ai.getGenerativeModel({ model: "gemini-pro" });
+    const response = await model.generateContent({
       contents: conversationContext,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
+      generationConfig: {
         temperature: 0.7,
         maxOutputTokens: 1000,
       },
     });
 
-    const botResponse = response.text;
-    // Saish Update
-   await prisma.conversation.create({
-      data: {
-        sessionId: currentSessionId,
-        userMessage: message,
-        botResponse: botResponse,
-        language: language,
-      },
-    });
+    const botResponse = response.response.text();
+
+    try {
+      // Store conversation in database
+      await prisma.conversation.create({
+        data: {
+          sessionId: currentSessionId,
+          userMessage: message,
+          botResponse: botResponse,
+          language: language,
+        },
+      });
+    } catch (dbError) {
+      console.error('Database error:', dbError);
+      // Continue execution even if database storage fails
+    }
 
     // Add bot response to history
     history.push({
