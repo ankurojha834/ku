@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KrishiBot - Farmer Chat Support</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+   <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+            background-attachment: fixed;
+            width: 100%;
+            height: 100%; /* Dynamic viewport height for mobile */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: clamp(5px, 2vw, 20px);
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: min(800px, calc(100vw - 20px));
+            height: clamp(300px, 90vh, 90dvh);
+            min-height: 90vh;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            border-radius: clamp(12px, 3vw, 20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), 0 8px 16px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            /* Mobile improvements */
+            transform: translateZ(0); /* Hardware acceleration */
+            will-change: transform;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #4CAF50, #2E7D32);
+            color: white;
+            padding: clamp(12px, 3vw, 20px);
+            text-align: center;
+            font-size: clamp(14px, 4vw, 18px);
+            font-weight: 600;
+            flex-shrink: 0;
+            position: relative;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chat-header::before {
+            content: "🌾";
+            font-size: clamp(18px, 5vw, 24px);
+            margin-right: 10px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: clamp(10px, 3vw, 20px);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: clamp(8px, 2vw, 15px);
+            min-height: 100%;
+            background: #f8f9fa;
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+        }
+
+        /* Custom scrollbar */
+        .chat-messages::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #4CAF50;
+            border-radius: 10px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #2E7D32;
+        }
+
+        .message {
+            display: flex;
+            margin-bottom: clamp(8px, 2vw, 15px);
+            max-width: 85%;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            hyphens: auto;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+
+        .message.bot {
+            justify-content: flex-start;
+            align-self: flex-start;
+        }
+
+        .message-bubble {
+            padding: clamp(10px, 3vw, 15px) clamp(12px, 4vw, 20px);
+            border-radius: clamp(15px, 4vw, 20px);
+            line-height: 1.5;
+            position: relative;
+            word-wrap: break-word;
+            max-width: 100%;
+            font-size: clamp(13px, 3.5vw, 16px);
+        }
+
+        .message.user .message-bubble {
+            background: #4CAF50;
+            color: white;
+            border-radius: clamp(15px, 4vw, 20px) clamp(15px, 4vw, 20px) 5px clamp(15px, 4vw, 20px);
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+        }
+
+        .message.bot .message-bubble {
+            background: white;
+            color: #1f2937;
+            border-radius: clamp(15px, 4vw, 20px) clamp(15px, 4vw, 20px) clamp(15px, 4vw, 20px) 5px;
+            border-left: 4px solid #4CAF50;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .message-time {
+            font-size: clamp(10px, 2.5vw, 11px);
+            opacity: 0.7;
+            margin-top: 8px;
+            display: block;
+        }
+
+        .message-content {
+            line-height: 1.5;
+            margin-bottom: 5px;
+        }
+
+        .message-list {
+            margin: 15px 0;
+            padding-left: 20px;
+        }
+
+        .message-list li {
+            margin: 8px 0;
+            line-height: 1.4;
+        }
+
+        .confidence-tag {
+            display: inline-block;
+            background: rgba(76, 175, 80, 0.1);
+            color: #2E7D32;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: clamp(10px, 2.5vw, 11px);
+            font-weight: 500;
+            margin: 5px 0;
+        }
+
+        .chat-input-area {
+            display: flex;
+            padding: clamp(10px, 3vw, 20px);
+            border-top: 1px solid #e5e7eb;
+            background: white;
+            flex-shrink: 0;
+            gap: clamp(8px, 2vw, 10px);
+            align-items: center;
+            min-height: 70px;
+        }
+
+        .chat-input-area input[type="text"] {
+            flex: 1;
+            padding: clamp(10px, 3vw, 15px) clamp(12px, 4vw, 20px);
+            border: 2px solid #e5e7eb;
+            border-radius: 25px;
+            font-size: clamp(14px, 3.5vw, 16px);
+            outline: none;
+            transition: border-color 0.3s ease;
+            font-family: inherit;
+            min-height: 45px;
+        }
+
+        .chat-input-area input[type="text"]:focus {
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+
+        .chat-input-area button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            width: clamp(40px, 10vw, 50px);
+            height: clamp(40px, 10vw, 50px);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+            font-size: clamp(10px, 2.5vw, 12px);
+            font-weight: 600;
+            touch-action: manipulation;
+        }
+
+        .chat-input-area button:hover {
+            background: #2E7D32;
+            transform: scale(1.05);
+        }
+
+        .chat-input-area button:active {
+            transform: scale(0.95);
+        }
+
+        .send-icon {
+            margin-left: 2px;
+            font-size: clamp(12px, 3vw, 14px);
+        }
+
+        /* Loading animation */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            opacity: 0.7;
+            padding: 10px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #4CAF50;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        @keyframes typing {
+            0%, 80%, 100% {
+                transform: scale(0);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Status indicators */
+        .bot-status {
+            position: absolute;
+            top: 50%;
+            right: clamp(10px, 3vw, 20px);
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: clamp(10px, 2.5vw, 11px);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .online-indicator {
+            width: 8px;
+            height: 8px;
+            background: #4CAF50;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+            }
+        }
+
+        /* Enhanced animations */
+        .message {
+            opacity: 0;
+            transform: translateY(20px);
+            animation: messageSlideIn 0.3s ease forwards;
+        }
+
+        @keyframes messageSlideIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Mobile specific improvements */
+        @media (max-width: 768px) {
+            body {
+                padding: 5px;
+                height: 100vh;
+                height: 100dvh;
+            }
+
+            .chat-container {
+                height: 95vh;
+                height: 95dvh;
+                border-radius: 15px;
+                max-width: calc(100vw - 10px);
+            }
+
+            .message {
+                max-width: 90%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 2px;
+                height: 100vh;
+                height: 100svh; /* Small viewport height for better mobile support */
+            }
+
+            .chat-container {
+                height: 98vh;
+                height: 98svh;
+                border-radius: 12px;
+                max-width: calc(100vw - 4px);
+            }
+
+            .chat-header {
+                min-height: 50px;
+                font-size: 14px;
+            }
+
+            .chat-header::before {
+                font-size: 18px;
+            }
+
+            .message {
+                max-width: 95%;
+            }
+
+            .message-bubble {
+                font-size: 14px;
+                padding: 10px 14px;
+            }
+
+            .bot-status {
+                font-size: 9px;
+                padding: 2px 6px;
+            }
+
+            .chat-input-area {
+                padding: 8px;
+                min-height: 60px;
+            }
+
+            .chat-input-area input[type="text"] {
+                font-size: 16px; /* Prevents zoom on iOS */
+                min-height: 40px;
+            }
+
+            .chat-input-area button {
+                width: 40px;
+                height: 40px;
+            }
+        }
+
+        /* Ultra small screens */
+        @media (max-width: 320px) {
+            .chat-header {
+                font-size: 12px;
+                padding: 10px 8px;
+            }
+
+            .chat-messages {
+                padding: 8px;
+            }
+
+            .message-bubble {
+                font-size: 13px;
+                padding: 8px 12px;
+            }
+
+            .chat-input-area {
+                padding: 6px;
+            }
+
+            .bot-status {
+                display: none; /* Hide on very small screens */
+            }
+        }
+
+        /* Landscape orientation fixes */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .chat-container {
+                height: 95vh;
+            }
+
+            .chat-header {
+                min-height: 45px;
+                padding: 8px 15px;
+            }
+
+            .chat-input-area {
+                min-height: 55px;
+                padding: 8px 15px;
+            }
+        }
+
+        /* Touch improvements */
+        @media (hover: none) and (pointer: coarse) {
+            .chat-input-area button:hover {
+                transform: none;
+            }
+
+            .chat-input-area button:active {
+                transform: scale(0.95);
+                background: #2E7D32;
+            }
+        }
+
+        /* High DPI displays */
+        @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+            .message-bubble {
+                border-width: 0.5px;
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            .chat-messages {
+                background: #f0f0f0;
+            }
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            .message {
+                animation: none;
+                opacity: 1;
+                transform: none;
+            }
+
+            .typing-dot {
+                animation: none;
+            }
+
+            .online-indicator {
+                animation: none;
+            }
+
+            .chat-input-area button:hover {
+                transform: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+     <div class="chat-container">
+        <div class="chat-header">
+            KrishiBot - Your Agricultural Assistant
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <!-- Chat messages will be appended here -->
+            <div class="message bot">
+                <div class="message-bubble">
+                    Hello! I'm here to help with your agricultural queries. How can I assist you today?
+                </div>
+            </div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="userInput" placeholder="Type your question here...">
+            <button id="sendButton">
+                Send
+                <span class="send-icon">&#10148;</span> <!-- Unicode for right arrow -->
+            </button>
+        </div>
+    </div>
+
+
+    <script>
+        const chatMessages = document.getElementsByClassName('chat-messages');
+        const userInput = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendButton');
+
+        // Replace with your actual Gemini API Key
+        const GEMINI_API_KEY = "AIzaSyBqKzH1URmBxuR_a63pfTE5O99Ox4ginG4";
+
+        async function sendMessage() {
+            const messageText = userInput.value.trim();
+            if (messageText === "") return;
+
+            // Display user message
+            appendMessage(messageText, 'user');
+            userInput.value = '';
+
+            // Add typing indicator
+            const typingMessage = appendTypingIndicator();
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-goog-api-key': GEMINI_API_KEY
+                    },
+                    body: JSON.stringify({
+                        contents: [
+                            {
+                                parts: [
+                                    { text: messageText }
+                                ]
+                            }
+                        ],
+                        systemInstruction: `You are KrishiSahayak, a trusted, concise, and empathetic Digital Krishi Officer (agricultural advisory assistant) whose job is to provide timely, practical, localized, and verifiable farming advice to smallholder farmers, extension officers, and agri-departments. Always prioritize farmer safety, low-tech usability, and local context.
+
+Behavioral rules
+
+Be concise and actionable. Lead with a 1–2 sentence answer (what to do now), then give a short explanation and simple next steps. Use numbered steps or bullets when giving instructions.
+
+Localize. Ask (or infer from context if provided) the crop, growth stage, exact symptom/issue, soil type, recent weather, and location (state/district/village). When location is provided, tailor recommendations to local agro-climatic conditions and common pests/diseases there.
+
+Language & literacy: Default to the user's language if known. Provide short answers in simple words; when literacy may be low, use short sentences and practical examples. Offer translations or audio-ready phrasing when asked.
+
+Multimodal inputs: If the user uploads a photo of a plant, analyze visible symptoms, give a likely diagnosis (with confidence level), and provide immediate mitigation steps. Suggest better photos (close-up of lesion, underside of leaf, whole-plant view, scale object) if image quality is insufficient.
+
+Uncertainty & confidence: Always state a confidence level (High / Medium / Low) for diagnoses or numeric estimates. If confidence is below "High," recommend confirmatory steps (lab test, extension officer visit, sending specimen).
+
+Safe pesticide / input advice: Prefer Integrated Pest Management (IPM) — cultural controls, biological controls, resistant varieties, and mechanical methods — before chemical pesticides. If chemical control is needed, specify only government-approved, locally registered active ingredient(s), exact dosage (unit), application timing, and PPE required. If local registration information is unavailable, say so and recommend contacting the local Krishi Bhavan.
+
+Subsidies & schemes: Provide only general guidance about common subsidy categories (inputs, micro-irrigation, machinery) and say explicitly when scheme details may vary by year/state — recommend checking the local agri-department website or helpline for exact eligibility and deadlines.
+
+Market & price info: Provide general market strategies (storage, grading, buyer types). For current mandis/prices or auction details, request permission to fetch up-to-date data and/or direct them to the nearest mandi or official price portal.
+
+When to escalate: If the problem threatens life/health, food safety, or involves regulated chemicals, instruct the user to contact local authorities or certified technicians and avoid giving risky stepwise instructions beyond immediate safe actions.
+
+No diagnostics without data: Never pretend to be certain. If critical data (crop stage, days since symptom onset, photos) is missing, ask 1–2 precise clarifying items only.
+
+Empathy & respect: Use encouraging and respectful tone — acknowledge the farmer's concern, validate constraints (time, money, literacy), and propose low-cost options first.
+
+Cite sources: For technical claims (diseases, pesticide dosages, lab tests), when possible cite the type of source (e.g., "state agri dept guidelines," "ICAR recommendations," "local Krishi Vigyan Kendra protocol") and recommend the official source for confirmation. If deployed with internet access, fetch and present the exact citation when asked.
+
+Output format (strict)
+
+Short answer (1–2 lines) — immediate action & confidence.
+
+Why (1–2 lines) — brief explanation.
+
+How (3–6 numbered steps) — practical things user can do right away; include quantities, timings, and PPE for chemical interventions.
+
+When to get help (1 line) — escalation criteria and contact type (e.g., Krishi Bhavan, lab).
+
+Alternative low-cost options (optional) — one or two options.
+
+Follow-up question(s) — at most one short question to collect missing critical info.
+
+Safety & prohibited behavior
+
+Do NOT provide veterinary or human medical prescriptions or diagnostics.
+
+Do NOT recommend banned/illegal pesticides, unregistered products, or unsafe chemical mixes.
+
+Do NOT give legal or financial advice beyond general guidance; direct to local specialists for exact eligibility.
+
+Avoid overconfident claims; always give confidence and ask for confirming data when needed.`
+                    })
+                });
+
+                // Remove typing indicator
+                if (typingMessage) {
+                    typingMessage.remove();
+                }
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('API Error:', errorData);
+                    appendMessage('Sorry, an error occurred. Please try again. 🔄', 'bot');
+                    return;
+                }
+
+                const data = await response.json();
+                const botResponse = data.candidates[0].content.parts[0].text;
+
+                // Display bot's response
+                appendMessage(botResponse, 'bot');
+            } catch (error) {
+                // Remove typing indicator
+                if (typingMessage) {
+                    typingMessage.remove();
+                }
+                console.error('Network or API call error:', error);
+                appendMessage('Sorry, I could not answer your question. Please check your connection and try again. 🌐', 'bot');
+            } finally {
+                scrollToBottom();
+            }
+        }
+
+        function appendMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', sender);
+            const messageBubble = document.createElement('div');
+            messageBubble.classList.add('message-bubble');
+            messageBubble.textContent = text;
+            messageDiv.appendChild(messageBubble);
+            chatMessages.appendChild(messageDiv);
+            scrollToBottom();
+            return messageDiv;
+        }
+
+        function appendTypingIndicator() {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', 'bot');
+            messageDiv.innerHTML = `
+                <div class="message-bubble">
+                    <div class="typing-indicator">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+            `;
+            chatMessages.appendChild(messageDiv);
+            scrollToBottom();
+            return messageDiv;
+        }
+
+        function scrollToBottom() {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Auto-resize input and better UX
+        userInput.addEventListener('input', function () {
+            if (this.value.length > 0) {
+                sendButton.style.background = '#2E7D32';
+            } else {
+                sendButton.style.background = '#4CAF50';
+            }
+        });
+
+        sendButton.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Focus input on load
+        window.addEventListener('load', function () {
+            userInput.focus();
+            scrollToBottom();
+        });
+    </script>
+</body>
+
+</html>

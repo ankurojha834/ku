@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
-import { Send, Leaf, Sun, CloudRain, Sprout, Moon, Palette, Languages } from "lucide-react"
+import { Send, Leaf, Sun, CloudRain, Sprout, Moon, Palette, Languages, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getCategoryColor, getCategoryIcon } from "@/lib/categoryUtils"
 
@@ -53,6 +53,8 @@ interface Translations {
     welcomeMessage: string
     errorMessage: string
     themeSelector: string
+    connecting: string
+    apiError: string
   }
 }
 
@@ -79,6 +81,8 @@ const translations: Translations = {
       "नमस्ते! मैं KrishiBot हूं, आपका कृषि सहायक। मैं फसल, कीट, मौसम, और खाद के बारे में सुझाव दे सकता हूं। आज मैं आपकी कैसे मदद कर सकता हूं?",
     errorMessage: "माफ करें, कुछ तकनीकी समस्या है। कृपया दोबारा कोशिश करें।",
     themeSelector: "थीम चुनें:",
+    connecting: "जुड़ रहे हैं...",
+    apiError: "AI सेवा से जुड़ने में समस्या हो रही है। कृपया बाद में कोशिश करें।"
   },
   en: {
     title: "KrishiBot",
@@ -96,6 +100,8 @@ const translations: Translations = {
       "Hello! I'm KrishiBot, your agriculture assistant. I can provide suggestions about crops, pests, weather, and fertilizers. How can I help you today?",
     errorMessage: "Sorry, there's a technical issue. Please try again.",
     themeSelector: "Choose Theme:",
+    connecting: "Connecting...",
+    apiError: "Having trouble connecting to AI service. Please try again later."
   },
   ml: {
     title: "KrishiBot",
@@ -113,6 +119,8 @@ const translations: Translations = {
       "നമസ്കാരം! ഞാൻ KrishiBot ആണ്, നിങ്ങളുടെ കൃഷി സഹായി. വിളകൾ, കീടങ്ങൾ, കാലാവസ്ഥ, വളങ്ങൾ എന്നിവയെക്കുറിച്ച് എനിക്ക് നിർദ്ദേശങ്ങൾ നൽകാൻ കഴിയും. ഇന്ന് ഞാൻ നിങ്ങളെ എങ്ങനെ സഹായിക്കും?",
     errorMessage: "ക്ഷമിക്കണം, ഒരു സാങ്കേതിക പ്രശ്നമുണ്ട്. ദയവായി വീണ്ടും ശ്രമിക്കുക.",
     themeSelector: "തീം തിരഞ്ഞെടുക്കുക:",
+    connecting: "കണക്ട് ചെയ്യുന്നു...",
+    apiError: "AI സേവനവുമായി ബന്ധിപ്പിക്കുന്നതിൽ പ്രശ്നം. ദയവായി പിന്നീട് ശ്രമിക്കുക."
   },
 }
 
@@ -151,8 +159,16 @@ const themes: Theme[] = [
   },
 ]
 
+// API Configuration
+const API_CONFIG = {
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001', // Your backend URL
+  endpoints: {
+    chat: '/api/chat'
+  }
+}
+
 export function KrishiBot() {
-  const [currentLanguage, setCurrentLanguage] = useState("hi")
+  const [currentLanguage, setCurrentLanguage] = useState<"hi" | "en" | "ml">("hi")
   const [showLanguageSelector, setShowLanguageSelector] = useState(false)
 
   const t = translations[currentLanguage]
@@ -171,6 +187,7 @@ export function KrishiBot() {
   const [currentTheme, setCurrentTheme] = useState(0)
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [showThemeSelector, setShowThemeSelector] = useState(false)
+  const [connectionError, setConnectionError] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
 
@@ -247,83 +264,31 @@ export function KrishiBot() {
     return "general"
   }
 
-  const simulateBotResponse = async (userMessage: string): Promise<string> => {
-    await new Promise((resolve) => setTimeout(resolve, 1000 + Math.random() * 2000))
+  // Function to call the backend API
+  const callKrishiAPI = async (userMessage: string): Promise<string> => {
+    try {
+      const response = await fetch(`${API_CONFIG.baseURL}${API_CONFIG.endpoints.chat}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: userMessage,
+          language: currentLanguage
+        }),
+      })
+      console.log('API response status:' + response);
 
-    const category = categorizeMessage(userMessage)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
 
-    const responses = {
-      hi: {
-        crop: [
-          "फसल के लिए मिट्टी की जांच कराएं और उचित बीज का चयन करें। सिंचाई का समय और मात्रा का ध्यान रखें।",
-          "इस मौसम में गेहूं की बुआई के लिए उन्नत किस्म का चयन करें। खाद की मात्रा 120:60:40 NPK प्रति हेक्टेयर रखें।",
-        ],
-        weather: [
-          "आज का मौसम फसल के लिए अनुकूल है। अगले 3 दिन बारिश की संभावना है, सिंचाई रोक दें।",
-          "तापमान बढ़ने से फसल को नुकसान हो सकता है। छायादार जाल का उपयोग करें और शाम को पानी दें।",
-        ],
-        pest: [
-          "कीट नियंत्रण के लिए नीम का तेल 5ml प्रति लीटर पानी में मिलाकर छिड़काव करें। रासायनिक दवा से पहले जैविक उपाय अपनाएं।",
-          "पत्तियों पर धब्बे दिख रहे हैं तो कॉपर ऑक्सीक्लोराइड 2 ग्राम प्रति लीटर पानी में मिलाकर स्प्रे करें।",
-        ],
-        fertilizer: [
-          "मिट्टी परीक्षण के आधार पर खाद दें। जैविक खाद का उपयोग करें - गोबर की खाद 10 टन प्रति हेक्टेयर।",
-          "फास्फोरस की कमी दिख रही है। DAP 100 किलो प्रति हेक्टेयर बुआई के समय दें।",
-        ],
-        general: [
-          "कृषि संबंधी किसी भी समस्या के लिए मैं यहाँ हूं। फसल, मौसम, कीट या खाद के बारे में पूछें।",
-          "आपकी खेती में सुधार के लिए आधुनिक तकनीक अപनाएं। ड्रिप सिंचाई और मल्चिंग का उपയോഗ कരें।",
-        ],
-      },
-      en: {
-        crop: [
-          "Test your soil and select appropriate seeds for your crop. Pay attention to irrigation timing and quantity.",
-          "For wheat sowing this season, choose improved varieties. Use fertilizer at 120:60:40 NPK per hectare.",
-        ],
-        weather: [
-          "Today's weather is favorable for crops. Rain is expected for the next 3 days, stop irrigation.",
-          "Rising temperature can damage crops. Use shade nets and water in the evening.",
-        ],
-        pest: [
-          "For pest control, spray neem oil 5ml per liter of water. Try organic methods before chemical pesticides.",
-          "If you see spots on leaves, spray copper oxychloride 2 grams per liter of water.",
-        ],
-        fertilizer: [
-          "Apply fertilizer based on soil testing. Use organic fertilizer - cow dung manure 10 tons per hectare.",
-          "Phosphorus deficiency is visible. Apply DAP 100 kg per hectare at sowing time.",
-        ],
-        general: [
-          "I'm here for any agriculture-related problems. Ask about crops, weather, pests, or fertilizers.",
-          "Adopt modern techniques to improve your farming. Use drip irrigation and mulching.",
-        ],
-      },
-      ml: {
-        crop: [
-          "വിളയ്ക്കായി മണ്ണ് പരിശോധന നടത്തി ഉചിതമായ വിത്ത് തിരഞ്ഞെടുക്കുക. നനയ്ക്കലിന്റെ സമയവും അളവും ശ്രദ്ധിക്കുക.",
-          "ഈ സീസണിൽ ഗോതമ്പ് വിതയ്ക്കാൻ മെച്ചപ്പെട്ട ഇനം തിരഞ്ഞെടുക്കുക. ഹെക്ടറിന് 120:60:40 NPK വളം ഉപയോഗിക്കുക.",
-        ],
-        weather: [
-          "ഇന്നത്തെ കാലാവസ്ഥ വിളകൾക്ക് അനുകൂലമാണ്. അടുത്ത 3 ദിവസം മഴയ്ക്ക് സാധ്യത, നനയ്ക്കൽ നിർത്തുക.",
-          "താപനില വർദ്ധിക്കുന്നത് വിളകൾക്ക് ദോഷം ചെയ്യും. ഷേഡ് നെറ്റ് ഉപയോഗിച്ച് വൈകുന്നേരം വെള്ളം കൊടുക്കുക.",
-        ],
-        pest: [
-          "കീട നിയന്ത്രണത്തിന് ലിറ്റർ വെള്ളത്തിൽ 5ml വേപ്പെണ്ണ കലർത്തി തളിക്കുക. രാസ മരുന്നിന് മുമ്പ് ജൈവിക മാർഗങ്ങൾ പരീക്ഷിക്കുക.",
-          "ഇലകളിൽ പാടുകൾ കാണുന്നുവെങ്കിൽ ലിറ്റർ വെള്ളത്തിൽ 2 ഗ്രാം കോപ്പർ ഓക്സിക്ലോറൈഡ് കലർത്തി തളിക്കുക.",
-        ],
-        fertilizer: [
-          "മണ്ണ് പരിശോധനയുടെ അടിസ്ഥാനത്തിൽ വളം നൽകുക. ജൈവ വളം ഉപയോഗിക്കുക - ഹെക്ടറിന് 10 ടൺ ചാണകം.",
-          "ഫോസ്ഫറസിന്റെ കുറവ് കാണുന്നു. വിതയ്ക്കുന്ന സമയത്ത് ഹെക്ടറിന് 100 കിലോ DAP നൽകുക.",
-        ],
-        general: [
-          "കൃഷിയുമായി ബന്ധപ്പെട്ട ഏത് പ്രശ്നത്തിനും ഞാൻ ഇവിടെയുണ്ട്. വിളകൾ, കാലാവസ്ഥ, കീടങ്ങൾ അല്ലെങ്കിൽ വളങ്ങളെക്കുറിച്ച് ചോദിക്കുക.",
-          "നിങ്ങളുടെ കൃഷി മെച്ചപ്പെടുത്താൻ ആധുനിക സാങ്കേതികവിദ്യ സ്വീകരിക്കുക. ഡ്രിപ്പ് ജലസേചനവും മൾച്ചിംഗും ഉപയോഗിക്കുക.",
-        ],
-      },
+      const data = await response.json()
+      return data.response || data.message || "I apologize, but I couldn't process your request properly."
+    } catch (error) {
+      console.error('API call failed:', error)
+      throw error
     }
-
-    const langResponses = responses[currentLanguage] || responses.hi
-    const categoryResponses = langResponses[category] || langResponses.general
-    return categoryResponses[Math.floor(Math.random() * categoryResponses.length)]
   }
 
   const handleSendMessage = async () => {
@@ -338,11 +303,14 @@ export function KrishiBot() {
     }
 
     setMessages((prev) => [...prev, userMessage])
+    const currentInput = inputValue
     setInputValue("")
     setIsLoading(true)
+    setConnectionError(false)
 
     try {
-      const botResponse = await simulateBotResponse(inputValue)
+      const botResponse = await callKrishiAPI(currentInput)
+      console.log('Bot response:', botResponse);
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
         text: botResponse,
@@ -353,9 +321,10 @@ export function KrishiBot() {
       setMessages((prev) => [...prev, botMessage])
     } catch (error) {
       console.error("Error getting bot response:", error)
+      setConnectionError(true)
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: t.errorMessage,
+        text: t.apiError,
         sender: "bot",
         timestamp: new Date(),
         category: "general",
@@ -373,10 +342,14 @@ export function KrishiBot() {
     }
   }
 
+  const handleSuggestionClick = (suggestion: string) => {
+    setInputValue(suggestion)
+  }
+
   return (
     <div className={`min-h-screen bg-gradient-to-br ${theme.background} p-4 transition-all duration-500`}>
       <div className="max-w-4xl mx-auto">
-        <Card className="h-[90vh] flex flex-col shadow-2xl border-0 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90">
+        <Card className="min-h-[90vh] flex flex-col shadow-2xl border-0 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90">
           <CardHeader className={`${theme.primary} text-white p-6 rounded-t-lg`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -386,6 +359,12 @@ export function KrishiBot() {
                 <div>
                   <h1 className="text-2xl font-bold">{t.title}</h1>
                   <p className="text-white/90 text-sm">{t.subtitle}</p>
+                  {connectionError && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <AlertCircle className="w-3 h-3 text-yellow-300" />
+                      <span className="text-xs text-yellow-300">Connection issues detected</span>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -426,7 +405,7 @@ export function KrishiBot() {
                       variant={currentLanguage === lang.code ? "secondary" : "ghost"}
                       size="sm"
                       onClick={() => {
-                        setCurrentLanguage(lang.code)
+                        setCurrentLanguage(lang.code as "hi" | "en" | "ml")
                         setShowLanguageSelector(false)
                       }}
                       className="flex items-center gap-2 text-white hover:bg-white/20"
@@ -495,7 +474,7 @@ export function KrishiBot() {
                             : `${theme.secondary} text-gray-800 dark:text-gray-200 rounded-bl-md`,
                         )}
                       >
-                        <p className="text-sm leading-relaxed">{message.text}</p>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
                       </div>
 
                       <div className="flex items-center gap-2 px-2">
@@ -525,16 +504,19 @@ export function KrishiBot() {
                       <AvatarFallback className={`${theme.secondary} ${theme.accent}`}>🌾</AvatarFallback>
                     </Avatar>
                     <div className={`${theme.secondary} rounded-2xl rounded-bl-md px-4 py-3`}>
-                      <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div
-                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "0.1s" }}
-                        ></div>
-                        <div
-                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "0.2s" }}
-                        ></div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                          <div
+                            className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                            style={{ animationDelay: "0.1s" }}
+                          ></div>
+                          <div
+                            className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                            style={{ animationDelay: "0.2s" }}
+                          ></div>
+                        </div>
+                        <span className="text-xs text-gray-500">{t.connecting}</span>
                       </div>
                     </div>
                   </div>
@@ -572,7 +554,8 @@ export function KrishiBot() {
                     key={suggestion}
                     variant="outline"
                     size="sm"
-                    onClick={() => setInputValue(suggestion)}
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    disabled={isLoading}
                     className="text-xs hover:bg-green-50 dark:hover:bg-green-900/20"
                   >
                     {suggestion}

@@ -1,0 +1,277 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  phone     String?
+  location  String?
+  language  String   @default("hi")
+  role      UserRole @default(FARMER)
+  
+  // Farming profile
+  farmSize  Float?   // in acres
+  crops     String[] // array of crops grown
+  soilType  String?
+  
+  // Relationships
+  posts         Post[]
+  conversations Conversation[]
+  profile       Profile?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Profile {
+  id      Int     @id @default(autoincrement())
+  bio     String?
+  avatar  String?
+  
+  // Farming specific details
+  experience     Int?      // years of farming experience
+  farmingMethods String[]  // organic, conventional, mixed
+  certifications String[]  // any agricultural certifications
+  
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int  @unique
+
+  @@map("profiles")
+}
+
+model Post {
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String?
+  published Boolean  @default(false)
+  category  String?  // farming tips, pest control, market updates, etc.
+  tags      String[] // for easier filtering
+  imageUrl  String?  // featured image
+  
+  authorId  Int
+  author    User     @relation(fields: [authorId], references: [id])
+  
+  // Engagement
+  views     Int      @default(0)
+  likes     Int      @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("posts")
+}
+
+model Conversation {
+  id          Int      @id @default(autoincrement())
+  sessionId   String
+  userMessage String
+  botResponse String
+  
+  // Metadata
+  language    String   @default("hi")
+  confidence  String?  // High, Medium, Low
+  category    String?  // pest, disease, fertilizer, weather, etc.
+  cropType    String?
+  location    String?
+  hasImage    Boolean  @default(false)
+  metadata    Json?    // additional structured data
+  
+  // User relationship (optional - for registered users)
+  user   User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId Int?
+  
+  // Feedback
+  rating      Int?     // 1-5 star rating
+  feedback    String?  // text feedback
+  isHelpful   Boolean?
+  
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sessionId])
+  @@index([category])
+  @@index([timestamp])
+  @@map("conversations")
+}
+
+model CropData {
+  id           Int      @id @default(autoincrement())
+  name         String   @unique
+  scientificName String?
+  category     String   // cereal, pulse, oilseed, vegetable, etc.
+  season       String[] // kharif, rabi, zaid
+  
+  // Growing conditions
+  soilTypes    String[] // suitable soil types
+  phRange      String?  // optimal pH range
+  temperature  String?  // optimal temperature range
+  rainfall     String?  // rainfall requirements
+  
+  // Cultivation details
+  seedRate     String?  // kg per acre
+  spacing      String?  // plant spacing
+  fertilizer   Json?    // NPK and other fertilizer recommendations
+  
+  // Common issues
+  commonPests     String[]
+  commonDiseases  String[]
+  
+  // Regional data
+  suitableStates String[] // states where this crop is suitable
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("crop_data")
+}
+
+model PestDisease {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  type        PestType // PEST, DISEASE, WEED
+  scientificName String?
+  
+  // Description
+  description String
+  symptoms    String[] // visible symptoms
+  affectedCrops String[] // crops that can be affected
+  
+  // Control measures
+  organicControl    String[] // organic/biological control methods
+  chemicalControl   String[] // approved chemical treatments
+  preventiveMeasures String[] // prevention strategies
+  
+  // Images and references
+  imageUrls    String[]
+  references   String[]
+  
+  // Regional data
+  prevalentInStates String[]
+  seasonality       String[] // when this pest/disease is most active
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("pest_diseases")
+}
+
+model MarketData {
+  id        Int      @id @default(autoincrement())
+  crop      String
+  variety   String?
+  state     String
+  district  String?
+  market    String   // mandi name
+  
+  // Price data
+  minPrice  Float
+  maxPrice  Float
+  avgPrice  Float
+  currency  String   @default("INR")
+  unit      String   @default("quintal")
+  
+  // Additional info
+  quality   String?  // grade/quality
+  quantity  Int?     // quantity traded
+  
+  date      DateTime
+  source    String   // data source
+  
+  createdAt DateTime @default(now())
+
+  @@index([crop, state, date])
+  @@map("market_data")
+}
+
+model WeatherData {
+  id          Int      @id @default(autoincrement())
+  location    String   // state/district
+  latitude    Float
+  longitude   Float
+  
+  // Current conditions
+  temperature Float
+  humidity    Float
+  rainfall    Float
+  windSpeed   Float?
+  pressure    Float?
+  
+  // Forecast data
+  forecast    Json?    // detailed forecast data
+  
+  date        DateTime
+  source      String   // weather API source
+  
+  createdAt DateTime @default(now())
+
+  @@index([location, date])
+  @@map("weather_data")
+}
+
+model GovernmentScheme {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String
+  category    String   // subsidy, insurance, equipment, etc.
+  
+  // Eligibility
+  eligibility   String[]
+  targetGroup   String[] // small farmers, women, SC/ST, etc.
+  crops         String[] // applicable crops (if any)
+  
+  // Benefits
+  benefitType   String   // financial, equipment, training
+  benefitAmount String?  // subsidy amount or percentage
+  
+  // Application details
+  applicationProcess String
+  requiredDocuments  String[]
+  deadlines         String?
+  
+  // Regional availability
+  states    String[] // applicable states
+  isActive  Boolean  @default(true)
+  
+  // Contact information
+  contactInfo Json?
+  
+  launchDate DateTime?
+  endDate    DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("government_schemes")
+}
+
+// Enums
+enum UserRole {
+  FARMER
+  EXTENSION_OFFICER
+  AGRI_EXPERT
+  ADMIN
+  BLOGGER
+}
+
+enum PestType {
+  PEST
+  DISEASE
+  WEED
+  NUTRIENT_DEFICIENCY
+}
