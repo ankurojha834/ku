@@ -1,24 +1,8 @@
-/*
-  Warnings:
-
-  - You are about to drop the `Post` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `User` table. If the table is not empty, all the data it contains will be lost.
-
-*/
 -- CreateEnum
 CREATE TYPE "public"."UserRole" AS ENUM ('FARMER', 'EXTENSION_OFFICER', 'AGRI_EXPERT', 'ADMIN', 'BLOGGER');
 
 -- CreateEnum
 CREATE TYPE "public"."PestType" AS ENUM ('PEST', 'DISEASE', 'WEED', 'NUTRIENT_DEFICIENCY');
-
--- DropForeignKey
-ALTER TABLE "public"."Post" DROP CONSTRAINT "Post_authorId_fkey";
-
--- DropTable
-DROP TABLE "public"."Post";
-
--- DropTable
-DROP TABLE "public"."User";
 
 -- CreateTable
 CREATE TABLE "public"."users" (

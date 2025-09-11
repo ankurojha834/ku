@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { GoogleGenAI } = require("@google/genai");
 const prisma = require('./prisma/libs/prisma');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -95,6 +96,13 @@ function generateSessionId() {
   return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
+
+// Init Gemini client
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
+
+// Load free model (Gemini 1.5 Flash is free)
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
 // Get or create conversation history
 function getConversationHistory(sessionId) {
   if (!conversationHistories.has(sessionId)) {
@@ -130,7 +138,6 @@ app.post('/api/chat', async (req, res) => {
     const conversationContext = [...history];
 
     // Create the model and generate content
-    const model = ai.getGenerativeModel({ model: "gemini-pro" });
     const response = await model.generateContent({
       contents: conversationContext,
       generationConfig: {
